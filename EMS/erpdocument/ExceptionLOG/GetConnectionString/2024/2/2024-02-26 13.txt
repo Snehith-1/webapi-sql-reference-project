@@ -1,0 +1,2 @@
+Error getting connection string: System.NullReferenceException: Object reference not set to an instance of an object.
+   at ems.utilities.Functions.dbconn.GetConnectionString(String companyCode) in D:\sql\StoryboardAPI\ems.utilities\Functions\dbconn.cs:line 72
