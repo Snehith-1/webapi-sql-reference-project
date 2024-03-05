@@ -1,0 +1,142 @@
+create database storyboard;
+USE [storyboard]
+GO
+
+/****** Object:  Table [dbo].[adm_mst_tconsumerdb] script by snehith      Script Date: 05-03-2024 13:36:49 ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[adm_mst_tconsumerdb](
+	[consumer_gid] [int] IDENTITY(1,1) NOT NULL,
+	[company_code] [varchar](25) NOT NULL,
+	[server_name] [varchar](128) NOT NULL,
+	[db_name] [varchar](25) NOT NULL,
+	[user_name] [varchar](25) NOT NULL,
+	[password] [varchar](64) NOT NULL,
+	[connection_string] [varchar](1024) NOT NULL,
+	[created_by] [varchar](25) NOT NULL,
+	[created_date] [datetime] NOT NULL,
+	[updated_by] [varchar](25) NULL,
+	[updated_date] [datetime] NULL,
+ CONSTRAINT [PK_adm_mst_tconsumerdb] PRIMARY KEY CLUSTERED 
+(
+	[consumer_gid] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY],
+ CONSTRAINT [UK_company_code] UNIQUE NONCLUSTERED 
+(
+	[company_code] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+
+
+USE [storyboard]
+GO
+
+/****** Object:  Table [dbo].[adm_trn_tconsumertoken] script by snehith    Script Date: 05-03-2024 13:38:01 ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[adm_trn_tconsumertoken](
+	[consumertoken_gid] [int] IDENTITY(1,1) NOT NULL,
+	[token] [varchar](1024) NOT NULL,
+	[company_code] [varchar](25) NOT NULL,
+	[user_code] [varchar](25) NOT NULL,
+	[connection_string] [varchar](1024) NOT NULL,
+PRIMARY KEY CLUSTERED 
+(
+	[consumertoken_gid] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+
+
+USE [storyboard]
+GO
+
+/****** Object:  StoredProcedure [dbo].[adm_mst_spgetconnectionstring]  script by snehith     Script Date: 05-03-2024 13:52:15 ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE PROCEDURE [dbo].[adm_mst_spgetconnectionstring]
+    @tokenvalue VARCHAR(1024)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT connection_string FROM adm_trn_tconsumertoken WHERE token = @tokenvalue;
+END
+GO
+
+
+USE [storyboard]
+GO
+
+/****** Object:  StoredProcedure [dbo].[adm_mst_spstoretoken] script by snehith      Script Date: 05-03-2024 13:52:42 ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE PROCEDURE [dbo].[adm_mst_spstoretoken]
+    @token VARCHAR(1024),
+    @usercode VARCHAR(25),
+    @user_password VARCHAR(1024),
+    @companycode VARCHAR(25),
+    @LoginFrom VARCHAR(10),
+    @WebToken VARCHAR(1024)
+AS
+BEGIN 
+    DECLARE @sql NVARCHAR(MAX);
+
+    -- Delete from adm_trn_tconsumertoken
+    DELETE FROM adm_trn_tconsumertoken WHERE company_code = @companycode AND user_Code=@usercode;
+
+    INSERT INTO adm_trn_tconsumertoken (token,company_code,user_code,connection_string)
+    VALUES(@token,@companycode,@usercode,(SELECT connection_string FROM adm_mst_tconsumerdb WHERE company_code=@companycode));
+
+    -- Delete from adm_mst_ttoken
+    SET @sql = '
+        DELETE FROM ' + QUOTENAME(@companycode) + '.dbo.adm_mst_ttoken 
+        WHERE login_from = ''' + @LoginFrom + ''' 
+        AND user_gid = (
+            SELECT user_gid 
+            FROM ' + QUOTENAME(@companycode) + '.dbo.adm_mst_tuser 
+            WHERE user_code = ''' + @usercode + '''
+        );';
+    EXEC sp_executesql @sql;
+
+    -- Insert into adm_mst_ttoken
+    SET @sql = '
+        INSERT INTO ' + QUOTENAME(@companycode) + '.dbo.adm_mst_ttoken (token, employee_gid, user_gid, company_code, department_gid, login_from, web_token)  
+        SELECT ' + QUOTENAME(@token) + ', b.employee_gid, a.user_gid, ' + QUOTENAME(@companycode) + ', c.department_gid, ' + QUOTENAME(@LoginFrom) + ', ' + QUOTENAME(@WebToken) + '
+        FROM  ' + QUOTENAME(@companycode) + '.dbo.adm_mst_tuser a
+        LEFT JOIN ' + QUOTENAME(@companycode) + '.dbo.hrm_mst_temployee b ON a.user_gid = b.user_gid 
+        LEFT JOIN ' + QUOTENAME(@companycode) + '.dbo.hrm_mst_tdepartment c ON b.department_gid = c.department_gid  
+        WHERE a.user_code = @usercode 
+            AND a.user_password = @user_password 
+            AND a.user_status = ''Y'';';
+    EXEC sp_executesql @sql;
+
+    -- Select user_gid
+    SET @sql = '
+        SELECT user_gid 
+        FROM ' + QUOTENAME(@companycode) + '.dbo.adm_mst_tuser 
+        WHERE user_code = ''' + @usercode + ''' 
+        AND user_password = ''' + @user_password + ''' 
+        AND user_status = ''Y'';';
+    EXEC sp_executesql @sql;
+END;
+GO
+
+
