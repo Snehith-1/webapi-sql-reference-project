@@ -77,19 +77,23 @@ BEGIN
 END
 GO
 
-
 USE [storyboard]
 GO
 
-/****** Object:  StoredProcedure [dbo].[adm_mst_spstoretoken] script by snehith      Script Date: 05-03-2024 13:52:42 ******/
+/****** Object:  StoredProcedure [dbo].[adm_mst_spstoretoken]    Script Date: 3/12/2024 12:11:21 PM ******/
 SET ANSI_NULLS ON
 GO
 
 SET QUOTED_IDENTIFIER ON
 GO
 
+
+
+
+
+
 CREATE PROCEDURE [dbo].[adm_mst_spstoretoken]
-    @token VARCHAR(1024),
+    @token VARCHAR(2044),
     @usercode VARCHAR(25),
     @user_password VARCHAR(1024),
     @companycode VARCHAR(25),
@@ -97,8 +101,9 @@ CREATE PROCEDURE [dbo].[adm_mst_spstoretoken]
     @WebToken VARCHAR(1024)
 AS
 BEGIN 
-    DECLARE @sql NVARCHAR(MAX);
 
+    DECLARE @sql NVARCHAR(MAX);
+	 DECLARE @sql1 NVARCHAR(MAX);
     -- Delete from adm_trn_tconsumertoken
     DELETE FROM adm_trn_tconsumertoken WHERE company_code = @companycode AND user_Code=@usercode;
 
@@ -114,18 +119,19 @@ BEGIN
             FROM ' + QUOTENAME(@companycode) + '.dbo.adm_mst_tuser 
             WHERE user_code = ''' + @usercode + '''
         );';
+		
     EXEC sp_executesql @sql;
+ 
+  SET @sql = '    
 
-    -- Insert into adm_mst_ttoken
-    SET @sql = '
-        INSERT INTO ' + QUOTENAME(@companycode) + '.dbo.adm_mst_ttoken (token, employee_gid, user_gid, company_code, department_gid, login_from, web_token)  
-        SELECT ' + QUOTENAME(@token) + ', b.employee_gid, a.user_gid, ' + QUOTENAME(@companycode) + ', c.department_gid, ' + QUOTENAME(@LoginFrom) + ', ' + QUOTENAME(@WebToken) + '
-        FROM  ' + QUOTENAME(@companycode) + '.dbo.adm_mst_tuser a
-        LEFT JOIN ' + QUOTENAME(@companycode) + '.dbo.hrm_mst_temployee b ON a.user_gid = b.user_gid 
-        LEFT JOIN ' + QUOTENAME(@companycode) + '.dbo.hrm_mst_tdepartment c ON b.department_gid = c.department_gid  
-        WHERE a.user_code = @usercode 
-            AND a.user_password = @user_password 
-            AND a.user_status = ''Y'';';
+    INSERT INTO ' + QUOTENAME(@companycode) + '.dbo.adm_mst_ttoken (token, employee_gid, user_gid, company_code, department_gid, login_from, web_token)  
+    SELECT '''+@token+''', b.employee_gid, a.user_gid, '''+@companycode+ ''', c.department_gid, '''+@LoginFrom + ''', ''' + @WebToken + '''
+    FROM  ' + QUOTENAME(@companycode) + '.dbo.adm_mst_tuser a
+    LEFT JOIN ' + (@companycode) + '.dbo.hrm_mst_temployee b ON a.user_gid = b.user_gid 
+    LEFT JOIN ' + (@companycode) + '.dbo.hrm_mst_tdepartment c ON b.department_gid = c.department_gid  
+    WHERE a.user_code =''' + (@usercode) + '''
+        AND a.user_password = '''+(@user_password)+'''
+        AND a.user_status = ''Y'';  ';		
     EXEC sp_executesql @sql;
 
     -- Select user_gid
@@ -135,8 +141,17 @@ BEGIN
         WHERE user_code = ''' + @usercode + ''' 
         AND user_password = ''' + @user_password + ''' 
         AND user_status = ''Y'';';
+
     EXEC sp_executesql @sql;
+
 END;
 GO
+
+
+USE [storyboard]
+SET IDENTITY_INSERT adm_mst_tconsumerdb ON
+insert into adm_mst_tconsumerdb(consumer_gid,company_code,server_name,db_name,user_name,password,connection_string,created_by,created_date,updated_by,updated_date)
+values(2,'nbfc','localhost','nbfc','snehith','114','Server=20.235.71.48,4018;Database=nbfc;User Id=vcxrpt;Password=Vision@18;Pooling = True;','E1','2020-08-07 00:00:00.000',NULL,NULL);
+SET IDENTITY_INSERT adm_mst_tconsumerdb OFF 
 
 
